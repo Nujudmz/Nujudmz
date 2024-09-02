@@ -1,0 +1,86 @@
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+public class AmazonAutomation {
+    public static void main(String[] args) {
+        // Set the path of your WebDriver executable
+        System.setProperty("webdriver.chrome.driver", "path/to/chromedriver");
+        // Initialize WebDriver
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments("--start-maximized");
+        WebDriver driver = new ChromeDriver(options);
+        driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
+        try {
+            // 1. Open Amazon Egypt and login
+            driver.get("https://www.amazon.eg/");
+            driver.findElement(By.id("nav-link-accountList")).click();
+            driver.findElement(By.id("ap_email")).sendKeys("your-email@example.com");
+            driver.findElement(By.id("continue")).click();
+            driver.findElement(By.id("ap_password")).sendKeys("your-password");
+            driver.findElement(By.id("signInSubmit")).click();
+            // 2. Open “All” menu from the left side
+            driver.findElement(By.id("nav-hamburger-menu")).click();
+            // 3. Click on “video games” then choose “all video games”
+            driver.findElement(By.linkText("Video Games")).click();
+            driver.findElement(By.linkText("All Video Games")).click();
+            // 4. Add filter “free shipping” & “new” condition
+            driver.findElement(By.xpath("//span[contains(text(),'Free Shipping')]/preceding-sibling::input")).click();
+            driver.findElement(By.xpath("//span[contains(text(),'New')]/preceding-sibling::input")).click();
+            // 5. Sort by price: high to low
+            WebElement sortMenu = driver.findElement(By.id("s-result-sort-select"));
+            sortMenu.click();
+            driver.findElement(By.xpath("//option[text()='Price: High to Low']")).click();
+            boolean foundProduct = false;
+            double totalAmount = 0.0;
+            // Loop through pages until products below 15k EGP are added to cart
+            while (!foundProduct) {
+                List<WebElement> products = driver.findElements(By.cssSelector(".s-main-slot .s-result-item"));
+                for (WebElement product : products) {
+                    String priceText = product.findElement(By.cssSelector(".a-price .a-offscreen")).getText();
+                    double price = parsePrice(priceText);
+                    if (price < 15000) {
+                        product.findElement(By.cssSelector(".s-add-to-cart-button")).click();
+                        totalAmount += price;
+                        foundProduct = true;
+                    }
+                }
+                if (!foundProduct) {
+                    WebElement nextPage = driver.findElement(By.cssSelector(".s-pagination-next"));
+                    if (nextPage.isEnabled()) {
+                        nextPage.click();
+                        TimeUnit.SECONDS.sleep(2); // wait for the next page to load
+                    } else {
+                        break; // Exit if no more pages are available
+                    }
+                }
+            }
+            // 7. Make sure that all products are already added to cart
+            driver.findElement(By.id("nav-cart")).click();
+            WebElement cartTotal = driver.findElement(By.cssSelector(".a-cart-span .a-price .a-offscreen"));
+            double cartTotalAmount = parsePrice(cartTotal.getText());
+            // 8. Add address and choose cash as payment method (Assuming address and payment options are handled on Amazon's checkout page)
+            driver.findElement(By.id("checkout-button")).click();
+            driver.findElement(By.id("address-input")).sendKeys("your-address");
+            driver.findElement(By.id("payment-method-cash")).click();
+            // 9. Ensure the total amount is correct
+            WebElement totalAmountElement = driver.findElement(By.cssSelector(".a-price .a-offscreen"));
+            double totalAmountOnPage = parsePrice(totalAmountElement.getText());
+            if (totalAmount == totalAmountOnPage) {
+                System.out.println("Total amount is correct");
+            } else {
+                System.out.println("Total amount is incorrect");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            driver.quit();
+        }
+    }
+    private static double parsePrice(String priceText) {
+        return Double.parseDouble(priceText.replaceAll("[^\\d.]", ""));
+    }
+}
